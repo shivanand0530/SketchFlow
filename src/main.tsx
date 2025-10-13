@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, HashRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
 import Landing from "./pages/Landing.tsx";
 import Canvas from "./pages/Canvas.tsx";
@@ -36,7 +36,7 @@ function RouteSyncer() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Provider store={store}>
-      <BrowserRouter>
+      <HashRouter>
         <RouteSyncer />
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -44,7 +44,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Toaster />
-      </BrowserRouter>
+      </HashRouter>
     </Provider>
   </StrictMode>,
 );
