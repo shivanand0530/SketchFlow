@@ -1,0 +1,1 @@
+ALTER TABLE board_objects ADD COLUMN IF NOT EXISTS data jsonb NOT NULL DEFAULT '{}'::jsonb;

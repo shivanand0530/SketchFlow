@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-export type ToolType = 'select' | 'circle' | 'rectangle' | 'point' | 'polygon' | 'polyline' | 'note';
+export type ToolType = 'select' | 'hand' | 'pen' | 'line' | 'arrow' | 'text' | 'sticky' | 'circle' | 'rectangle' | 'point' | 'polygon' | 'polyline' | 'note';
 
 export interface Point {
   x: number;
@@ -9,7 +9,7 @@ export interface Point {
 
 export interface Shape {
   id: string;
-  type: 'circle' | 'rectangle' | 'point' | 'polygon' | 'polyline';
+  type: 'circle' | 'rectangle' | 'point' | 'polygon' | 'polyline' | 'pen' | 'line' | 'arrow';
   color: string;
   timestamp: number;
   properties: {
@@ -19,7 +19,13 @@ export interface Shape {
     width?: number;
     height?: number;
     points?: Point[];
+    start?: Point;
+    end?: Point;
+    fill?: string;
+    strokeWidth?: number;
+    opacity?: number;
   };
+  rotation?: number;
 }
 
 export interface Note {
@@ -29,6 +35,9 @@ export interface Note {
   y: number;
   color: string;
   timestamp: number;
+  width?: number;
+  height?: number;
+  textColor?: string;
 }
 
 export interface ViewState {
@@ -43,13 +52,19 @@ export interface DrawingState {
   tempShape: Shape | null;
 }
 
-interface CanvasState {
+export interface CanvasSnapshot {
+  shapes: Shape[];
+  notes: Note[];
+}
+
+export interface CanvasState {
   shapes: Shape[];
   notes: Note[];
   viewState: ViewState;
   currentTool: ToolType;
   currentColor: string;
   selectedShapeId: string | null;
+  selectedIds: string[];
   drawingState: DrawingState;
   history: {
     past: Array<{ shapes: Shape[]; notes: Note[] }>;
@@ -64,6 +79,7 @@ const initialState: CanvasState = {
   currentTool: 'select',
   currentColor: '#000000',
   selectedShapeId: null,
+  selectedIds: [],
   drawingState: { isDrawing: false, points: [], tempShape: null },
   history: { past: [], future: [] },
 };
@@ -92,6 +108,21 @@ const canvasSlice = createSlice({
         state.shapes[shapeIndex] = { ...state.shapes[shapeIndex], ...action.payload.updates };
       }
     },
+    updateNotePositionTransient: (state, action: PayloadAction<{ id: string; updates: Partial<Note> }>) => {
+      const note = state.notes.find((item) => item.id === action.payload.id);
+      if (note) Object.assign(note, action.payload.updates);
+    },
+    commitDrag: (state, action: PayloadAction<CanvasSnapshot>) => {
+      state.history.past.push(action.payload);
+      state.history.future = [];
+    },
+    replaceDocument: (state, action: PayloadAction<CanvasSnapshot>) => {
+      state.shapes = action.payload.shapes;
+      state.notes = action.payload.notes;
+      state.history = { past: [], future: [] };
+      state.selectedShapeId = null;
+      state.selectedIds = [];
+    },
     deleteShape: (state, action: PayloadAction<string>) => {
       state.history.past.push({ shapes: JSON.parse(JSON.stringify(state.shapes)), notes: JSON.parse(JSON.stringify(state.notes)) }); // Deep copy
       state.history.future = [];
@@ -102,6 +133,7 @@ const canvasSlice = createSlice({
       if (state.selectedShapeId === action.payload) {
         state.selectedShapeId = null;
       }
+      state.selectedIds = state.selectedIds.filter((id) => id !== action.payload);
     },
     addNote: (state, action: PayloadAction<Note>) => {
       state.history.past.push({ shapes: JSON.parse(JSON.stringify(state.shapes)), notes: JSON.parse(JSON.stringify(state.notes)) }); // Deep copy
@@ -122,6 +154,19 @@ const canvasSlice = createSlice({
         }
       }
     },
+    updateNotePosition: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
+      const note = state.notes.find((item) => item.id === action.payload.id);
+      if (note) {
+        note.x = action.payload.x;
+        note.y = action.payload.y;
+      }
+    },
+    updateNoteStyle: (state, action: PayloadAction<{ id: string; updates: Partial<Note> }>) => {
+      state.history.past.push({ shapes: JSON.parse(JSON.stringify(state.shapes)), notes: JSON.parse(JSON.stringify(state.notes)) });
+      state.history.future = [];
+      const note = state.notes.find((item) => item.id === action.payload.id);
+      if (note) Object.assign(note, action.payload.updates);
+    },
     deleteNote: (state, action: PayloadAction<string>) => {
       state.history.past.push({ shapes: JSON.parse(JSON.stringify(state.shapes)), notes: JSON.parse(JSON.stringify(state.notes)) }); // Deep copy
       state.history.future = [];
@@ -129,6 +174,7 @@ const canvasSlice = createSlice({
       if (noteIndex !== -1) {
         state.notes.splice(noteIndex, 1);
       }
+      state.selectedIds = state.selectedIds.filter((id) => id !== action.payload);
     },
     setTool: (state, action: PayloadAction<ToolType>) => {
       // If we're currently drawing a polygon or polyline with points, save it before switching tools
@@ -150,6 +196,7 @@ const canvasSlice = createSlice({
       
       state.currentTool = action.payload;
       state.selectedShapeId = null;
+      state.selectedIds = [];
       // Clear drawing state when switching tools
       state.drawingState = { isDrawing: false, points: [], tempShape: null };
     },
@@ -158,6 +205,39 @@ const canvasSlice = createSlice({
     },
     setSelectedShape: (state, action: PayloadAction<string | null>) => {
       state.selectedShapeId = action.payload;
+      state.selectedIds = action.payload ? [action.payload] : [];
+    },
+    setSelectedIds: (state, action: PayloadAction<string[]>) => {
+      state.selectedIds = action.payload;
+      state.selectedShapeId = action.payload[0] ?? null;
+    },
+    bringForward: (state, action: PayloadAction<string[]>) => {
+      const ids = new Set(action.payload);
+      for (let index = state.shapes.length - 2; index >= 0; index -= 1) {
+        if (ids.has(state.shapes[index].id) && !ids.has(state.shapes[index + 1].id)) {
+          [state.shapes[index], state.shapes[index + 1]] = [state.shapes[index + 1], state.shapes[index]];
+        }
+      }
+    },
+    sendBackward: (state, action: PayloadAction<string[]>) => {
+      const ids = new Set(action.payload);
+      for (let index = 1; index < state.shapes.length; index += 1) {
+        if (ids.has(state.shapes[index].id) && !ids.has(state.shapes[index - 1].id)) {
+          [state.shapes[index], state.shapes[index - 1]] = [state.shapes[index - 1], state.shapes[index]];
+        }
+      }
+    },
+    bringToFront: (state, action: PayloadAction<string[]>) => {
+      const ids = new Set(action.payload);
+      const selected = state.shapes.filter((shape) => ids.has(shape.id));
+      state.shapes = state.shapes.filter((shape) => !ids.has(shape.id));
+      state.shapes.push(...selected);
+    },
+    sendToBack: (state, action: PayloadAction<string[]>) => {
+      const ids = new Set(action.payload);
+      const selected = state.shapes.filter((shape) => ids.has(shape.id));
+      state.shapes = state.shapes.filter((shape) => !ids.has(shape.id));
+      state.shapes.unshift(...selected);
     },
     setPan: (state, action: PayloadAction<{ x: number; y: number }>) => {
       state.viewState.panX = action.payload.x;
@@ -188,6 +268,7 @@ const canvasSlice = createSlice({
       state.shapes = [];
       state.notes = [];
       state.selectedShapeId = null;
+      state.selectedIds = [];
     },
     undo: (state) => {
       if (state.history.past.length > 0) {
@@ -196,6 +277,7 @@ const canvasSlice = createSlice({
         state.shapes = previousState.shapes;
         state.notes = previousState.notes;
         state.selectedShapeId = null;
+        state.selectedIds = [];
       }
     },
     redo: (state) => {
@@ -205,6 +287,7 @@ const canvasSlice = createSlice({
         state.shapes = nextState.shapes;
         state.notes = nextState.notes;
         state.selectedShapeId = null;
+        state.selectedIds = [];
       }
     },
   },
@@ -214,13 +297,23 @@ export const {
   addShape,
   updateShape,
   updateShapePosition,
+  updateNotePositionTransient,
+  commitDrag,
+  replaceDocument,
   deleteShape,
   addNote,
   updateNote,
+  updateNotePosition,
+  updateNoteStyle,
   deleteNote,
   setTool,
   setColor,
   setSelectedShape,
+  setSelectedIds,
+  bringForward,
+  sendBackward,
+  bringToFront,
+  sendToBack,
   setPan,
   setZoom,
   startDrawing,

@@ -8,16 +8,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface NoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (text: string) => void;
+  initialText?: string;
 }
 
-export function NoteDialog({ open, onOpenChange, onSubmit }: NoteDialogProps) {
-  const [text, setText] = useState('');
+export function NoteDialog({ open, onOpenChange, onSubmit, initialText = '' }: NoteDialogProps) {
+  const [text, setText] = useState(initialText);
+  useEffect(() => { if (open) setText(initialText); }, [open, initialText]);
 
   const handleSubmit = () => {
     if (text.trim()) {
@@ -31,7 +33,7 @@ export function NoteDialog({ open, onOpenChange, onSubmit }: NoteDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Note</DialogTitle>
+          <DialogTitle>{initialText ? 'Edit note' : 'Add Note'}</DialogTitle>
           <DialogDescription>Enter the text for your note</DialogDescription>
         </DialogHeader>
         <Input
