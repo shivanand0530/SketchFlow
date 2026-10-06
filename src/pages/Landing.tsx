@@ -23,7 +23,7 @@ export default function Landing() {
             SketchFlow
           </button>
           <div className="flex min-w-0 items-center gap-1 sm:gap-3">
-            {user ? <><Button variant="ghost" className="hidden sm:inline-flex" onClick={() => navigate('/boards')}>Open workspace</Button><UserProfile /></> : <><Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Log in</Button><Button size="sm" className="bg-[#1f5148] hover:bg-[#173b36] sm:h-10 sm:px-6" onClick={() => navigate('/register')}>Start sketching <ArrowRight className="ml-1 h-4 w-4 sm:ml-2" /></Button></>}
+            {user ? <><Button variant="ghost" className="hidden sm:inline-flex" onClick={() => navigate('/boards')}>Open workspace</Button><UserProfile /></> : <><Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Log in</Button><Button variant="ghost" size="sm" onClick={() => navigate('/guest')}>Try as guest</Button><Button size="sm" className="bg-[#1f5148] hover:bg-[#173b36] sm:h-10 sm:px-6" onClick={() => navigate('/register')}>Start sketching <ArrowRight className="ml-1 h-4 w-4 sm:ml-2" /></Button></>}
           </div>
         </div>
       </header>
@@ -33,7 +33,7 @@ export default function Landing() {
           <p className="mb-6 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-[#d46b45]"><span className="h-px w-8 bg-[#d46b45]" />Visual thinking, made tangible</p>
           <h1 className="max-w-xl text-5xl font-semibold leading-[0.98] tracking-[-0.04em] text-[#173b36] sm:text-7xl">Make the shape of an idea visible.</h1>
           <p className="mt-8 max-w-lg text-lg leading-8 text-[#53645f]">SketchFlow is a focused canvas for mapping ideas, planning systems, and turning a blank page into shared understanding.</p>
-          <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-center"><Button size="lg" className="bg-[#1f5148] px-6 hover:bg-[#173b36]" onClick={() => navigate(user ? '/boards' : '/register')}>{user ? 'Open your workspace' : 'Create your free workspace'} <ArrowRight className="ml-2 h-4 w-4" /></Button><span className="flex items-center gap-2 text-sm text-[#53645f]"><Check className="h-4 w-4 text-[#d46b45]" />No clutter. Just room to think.</span></div>
+          <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-center"><Button size="lg" className="bg-[#1f5148] px-6 hover:bg-[#173b36]" onClick={() => navigate(user ? '/boards' : '/register')}>{user ? 'Open your workspace' : 'Create your free workspace'} <ArrowRight className="ml-2 h-4 w-4" /></Button><Button variant="outline" size="lg" onClick={() => navigate('/guest')}>Try the canvas as a guest</Button><span className="flex items-center gap-2 text-sm text-[#53645f]"><Check className="h-4 w-4 text-[#d46b45]" />No clutter. Just room to think.</span></div>
         </div>
         <div className="relative min-h-[300px] sm:min-h-[360px] lg:min-h-[440px]">
           <div className="absolute inset-6 rotate-2 rounded-[2rem] border border-[#1f5148]/20 bg-[#e4ebe3] shadow-[18px_20px_0_#d7dfd7]" />

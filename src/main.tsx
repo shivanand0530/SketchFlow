@@ -15,6 +15,7 @@ const Boards = lazy(() => import("./pages/Boards.tsx"));
 const Canvas = lazy(() => import("./pages/Canvas.tsx"));
 const Login = lazy(() => import("./pages/Login.tsx"));
 const Register = lazy(() => import("./pages/Register.tsx"));
+const Guest = lazy(() => import("./pages/Guest.tsx"));
 
 function RouteSyncer() {
   const location = useLocation();
@@ -49,6 +50,7 @@ createRoot(document.getElementById("root")!).render(
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/guest" element={<Guest />} />
             <Route path="/" element={<Landing />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/boards" element={<Boards />} />
