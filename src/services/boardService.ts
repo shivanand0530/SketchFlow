@@ -81,13 +81,13 @@ const dimensionsForShape = (shape: Shape) => {
 export const toBoardDocument = ({ shapes, notes }: CanvasSnapshot): BoardDocument => ({
   objects: [
     ...shapes.map((shape): BoardObject => ({ id: shape.id, type: shape.type, position: { x: shape.properties.x ?? shape.properties.points?.[0]?.x ?? shape.properties.start?.x ?? 0, y: shape.properties.y ?? shape.properties.points?.[0]?.y ?? shape.properties.start?.y ?? 0 }, dimensions: dimensionsForShape(shape), rotation: shape.rotation ?? 0, style: { color: shape.color }, properties: shape.properties })),
-    ...notes.map((note): BoardObject => ({ id: note.id, type: 'note', position: { x: note.x, y: note.y }, dimensions: { width: note.width ?? 180, height: note.height ?? 90 }, rotation: 0, style: { color: note.color, textColor: note.textColor }, text: note.text })),
+    ...notes.map((note): BoardObject => ({ id: note.id, type: 'note', position: { x: note.x, y: note.y }, dimensions: { width: note.width ?? 180, height: note.height ?? 90 }, rotation: 0, style: { color: note.color, textColor: note.textColor }, text: note.text, kind: note.kind ?? 'sticky' })),
   ],
 });
 
 export const fromBoardDocument = (document: BoardDocument): CanvasSnapshot => document.objects.reduce<CanvasSnapshot>((snapshot, object) => {
   if (object.type === 'note') {
-    snapshot.notes.push({ id: object.id, text: object.text ?? '', x: object.position.x, y: object.position.y, color: object.style.color, width: object.dimensions.width, height: object.dimensions.height, textColor: object.style.textColor, timestamp: Date.now() });
+    snapshot.notes.push({ id: object.id, text: object.text ?? '', x: object.position.x, y: object.position.y, color: object.style.color, width: object.dimensions.width, height: object.dimensions.height, textColor: object.style.textColor, kind: object.kind ?? 'sticky', timestamp: Date.now() });
   } else {
     snapshot.shapes.push({ id: object.id, type: object.type, color: object.style.color, timestamp: Date.now(), rotation: object.rotation, properties: object.properties as Shape['properties'] });
   }

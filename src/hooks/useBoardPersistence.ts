@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { replaceDocument } from '@/store/canvasSlice';
+import { redo, replaceDocument, undo } from '@/store/canvasSlice';
 import { acceptBoardShareToken, fromBoardDocument, listBoardHistory, listBoardObjects, syncBoardObjects, toBoardDocument, type CanvasSnapshot } from '@/services/boardService';
 import { WebSocketService, collaborationServerEvents, type ConnectionStatus } from '@/services/websocketService';
 import { useAuth } from '@/auth/AuthContext';
@@ -34,20 +34,21 @@ export function useBoardPersistence() {
   const previousDocumentRef = useRef<ReturnType<typeof toBoardDocument> | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const { user } = useAuth();
+  const isLocalBoard = !boardId || user?.type === 'guest';
 
   useEffect(() => {
-    dispatch(setCurrentUser(user && boardId ? { userId: user.id, displayName: user.displayName, color: collaborationColor(user.id), boardId } : null));
+    dispatch(setCurrentUser(user && boardId && !isLocalBoard ? { userId: user.id, displayName: user.displayName, color: collaborationColor(user.id), boardId } : null));
     return () => { dispatch(clearCollaboration()); };
-  }, [boardId, dispatch, user]);
+  }, [boardId, dispatch, isLocalBoard, user]);
 
   useEffect(() => {
-    if (!boardId) return;
+    if (!boardId || isLocalBoard) return;
     const cleanup = window.setInterval(() => dispatch(pruneCursors(Date.now())), 3000);
     return () => window.clearInterval(cleanup);
-  }, [boardId, dispatch]);
+  }, [boardId, dispatch, isLocalBoard]);
 
   useEffect(() => {
-    if (!boardId) return;
+    if (!boardId || isLocalBoard) return;
     const service = new WebSocketService();
     socketRef.current = service;
     const unsubscribeStatus = service.subscribeStatus((status) => {
@@ -94,23 +95,27 @@ export function useBoardPersistence() {
     if (inviteToken) acceptBoardShareToken(inviteToken).then(connect).catch((error) => console.error('Unable to accept board invite:', error));
     else connect();
     return () => { unsubscribe(); unsubscribeStatus(); service.disconnect(); socketRef.current = null; dispatch(clearCollaboration()); };
-  }, [boardId, dispatch, inviteToken]);
+  }, [boardId, dispatch, inviteToken, isLocalBoard]);
 
   useEffect(() => {
     const requestHistoryAction = (event: Event) => {
-      if (!boardId || !socketRef.current?.connected) return;
       const type = (event as CustomEvent<'undo' | 'redo'>).detail;
+      if (isLocalBoard) {
+        dispatch(type === 'undo' ? undo() : redo());
+        return;
+      }
+      if (!socketRef.current?.connected) return;
       const operationId = type === 'undo' ? socketRef.current.undo() : socketRef.current.redo();
       if (operationId) pendingOperationsRef.current.add(operationId);
     };
     window.addEventListener('sketchflow:history-action', requestHistoryAction);
     return () => window.removeEventListener('sketchflow:history-action', requestHistoryAction);
-  }, [boardId]);
+  }, [dispatch, isLocalBoard]);
 
   useEffect(() => {
     hasLoaded.current = false;
     let cancelled = false;
-    if (!boardId) {
+    if (isLocalBoard) {
       previousDocumentRef.current = null;
       dispatch(replaceDocument(parseLocalBoard(localStorage.getItem(localKey))));
       hasLoaded.current = true;
@@ -133,13 +138,13 @@ export function useBoardPersistence() {
         }
       });
     return () => { cancelled = true; };
-  }, [boardId, dispatch, inviteToken, localKey]);
+  }, [boardId, dispatch, inviteToken, isLocalBoard, localKey]);
 
   useEffect(() => {
     if (!hasLoaded.current) return;
     const timeout = window.setTimeout(() => {
       const document = toBoardDocument({ shapes, notes });
-      if (boardId && !applyingRemoteRef.current && socketRef.current?.connected) {
+      if (boardId && !isLocalBoard && !applyingRemoteRef.current && socketRef.current?.connected) {
         const previous = previousDocumentRef.current ?? { objects: [] };
         const previousById = new Map(previous.objects.map((object) => [object.id, object]));
         const currentById = new Map(document.objects.map((object) => [object.id, object]));
@@ -153,13 +158,13 @@ export function useBoardPersistence() {
           if (operationId) pendingOperationsRef.current.add(operationId);
         });
         previousDocumentRef.current = document;
-      } else if (boardId) {
+      } else if (boardId && !isLocalBoard) {
         syncBoardObjects(boardId, document).catch((error) => console.error('Unable to save board:', error));
       }
       else localStorage.setItem(localKey, JSON.stringify(document));
     }, 600);
     return () => window.clearTimeout(timeout);
-  }, [boardId, shapes, notes, localKey]);
+  }, [boardId, isLocalBoard, shapes, notes, localKey]);
 
   const moveCursor = (cursor: Omit<CollaborationCursor, 'userId' | 'boardId'>) => {
     if (user && boardId && socketRef.current?.connected) socketRef.current.moveCursor({ ...cursor, userId: user.id, boardId });

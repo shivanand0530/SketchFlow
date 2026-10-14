@@ -6,7 +6,7 @@ import { ProtectedRoute } from '../src/auth/ProtectedRoute';
 import * as authService from '../src/services/authService';
 import { fromBoardDocument, listBoards, toBoardDocument } from '../src/services/boardService';
 import { WebSocketService } from '../src/services/websocketService';
-import canvasReducer, { addShape, redo, undo, type Shape } from '../src/store/canvasSlice';
+import canvasReducer, { addNote, addShape, redo, undo, type Shape } from '../src/store/canvasSlice';
 import collaborationReducer, { setCursor, setPresence } from '../src/store/collaborationSlice';
 
 const user = { id: '00000000-0000-0000-0000-000000000001', email: 'user@example.com', displayName: 'User' };
@@ -78,6 +78,18 @@ describe('frontend board and canvas state', () => {
     expect(state.shapes).toHaveLength(0);
     state = canvasReducer(state, redo());
     expect(state.shapes).toHaveLength(1);
+  });
+
+  it('keeps text notes free of sticky-note backgrounds while keeping sticky notes boxed', () => {
+    const textNote = { id: 'text-note', text: 'Hello', x: 12, y: 20, color: '#f8fafc', timestamp: 1, kind: 'text' as const };
+    const stickyNote = { id: 'sticky-note', text: 'World', x: 40, y: 80, color: '#fef08a', timestamp: 2, width: 180, height: 90, kind: 'sticky' as const };
+
+    let state = canvasReducer(undefined, addNote(textNote));
+    state = canvasReducer(state, addNote(stickyNote));
+
+    expect(state.notes).toHaveLength(2);
+    expect(state.notes[0]).toMatchObject({ id: 'text-note', kind: 'text' });
+    expect(state.notes[1]).toMatchObject({ id: 'sticky-note', color: '#fef08a', kind: 'sticky' });
   });
 });
 

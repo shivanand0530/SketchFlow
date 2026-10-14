@@ -8,6 +8,7 @@ export interface BoardObject {
   rotation: number;
   style: { color: string; textColor?: string };
   text?: string;
+  kind?: 'text' | 'sticky';
   properties?: Record<string, unknown>;
 }
 

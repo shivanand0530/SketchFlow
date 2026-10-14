@@ -16,6 +16,7 @@ export const boardObjectSchema = z.object({
   rotation: z.number().finite().gte(-1000).lte(1000),
   style: z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/), textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }).strict(),
   text: z.string().max(10000).optional(),
+  kind: z.enum(['text', 'sticky']).optional(),
   properties: z.record(z.string().max(64), z.unknown()).optional(),
 }).strict();
 

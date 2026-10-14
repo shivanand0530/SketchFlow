@@ -19,6 +19,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const GUEST_BOARDS_KEY = 'sketchflow-guest-boards';
+
+const readGuestBoards = (): Board[] => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(GUEST_BOARDS_KEY) ?? '[]') as Board[];
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+};
+
 export default function Boards() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -30,8 +41,12 @@ export default function Boards() {
   const [boardBeingDeleted, setBoardBeingDeleted] = useState<Board | null>(null);
 
   useEffect(() => {
+    if (user?.type === 'guest') {
+      setBoards(readGuestBoards());
+      return;
+    }
     listBoards().then(setBoards).catch((error) => console.error('Unable to load boards:', error));
-  }, []);
+  }, [user?.type]);
 
   const openCreateDialog = () => {
     setNameDialogMode('create');
@@ -40,12 +55,22 @@ export default function Boards() {
   };
 
   const createBoard = async (name: string) => {
+    if (user?.type === 'guest') {
+      const now = new Date().toISOString();
+      const board: Board = { id: `guest-board-${crypto.randomUUID()}`, name, createdBy: user.id, createdAt: now, updatedAt: now, role: 'owner' };
+      const nextBoards = [...boards, board];
+      localStorage.setItem(GUEST_BOARDS_KEY, JSON.stringify(nextBoards));
+      setBoards(nextBoards);
+      navigate(`/canvas?board=${encodeURIComponent(board.id)}`);
+      return;
+    }
     const board = await createBoardRequest(name);
     setBoards((current) => [...current, board]);
     navigate(`/canvas?board=${board.id}`);
   };
 
   const shareBoard = async (boardId: string) => {
+    if (user?.type === 'guest') return;
     const token = await createBoardShareToken(boardId);
     const shareUrl = `${window.location.origin}${window.location.pathname}#/canvas?board=${encodeURIComponent(boardId)}&invite=${encodeURIComponent(token)}`;
     await navigator.clipboard.writeText(shareUrl);
@@ -60,6 +85,13 @@ export default function Boards() {
 
   const submitBoardName = async (name: string) => {
     if (nameDialogMode === 'rename' && boardBeingRenamed) {
+      if (user?.type === 'guest') {
+        const updated = { ...boardBeingRenamed, name, updatedAt: new Date().toISOString() };
+        const nextBoards = boards.map((item) => item.id === updated.id ? updated : item);
+        localStorage.setItem(GUEST_BOARDS_KEY, JSON.stringify(nextBoards));
+        setBoards(nextBoards);
+        return;
+      }
       const updated = await updateBoard(boardBeingRenamed.id, name);
       setBoards((current) => current.map((item) => item.id === updated.id ? updated : item));
       return;
@@ -69,6 +101,13 @@ export default function Boards() {
 
   const confirmDeleteBoard = async () => {
     if (!boardBeingDeleted || boards.length === 1) return;
+    if (user?.type === 'guest') {
+      const nextBoards = boards.filter((board) => board.id !== boardBeingDeleted.id);
+      localStorage.setItem(GUEST_BOARDS_KEY, JSON.stringify(nextBoards));
+      setBoards(nextBoards);
+      setBoardBeingDeleted(null);
+      return;
+    }
     await deleteBoard(boardBeingDeleted.id);
     setBoards((current) => current.filter((board) => board.id !== boardBeingDeleted.id));
     setBoardBeingDeleted(null);

@@ -38,6 +38,7 @@ export interface Note {
   width?: number;
   height?: number;
   textColor?: string;
+  kind?: 'text' | 'sticky';
 }
 
 export interface ViewState {

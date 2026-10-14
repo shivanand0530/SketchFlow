@@ -19,7 +19,6 @@ const tools: Array<{ type: ToolType; icon: typeof MousePointer2; label: string; 
   { type: 'line', icon: Minus, label: 'Line', shortcut: 'L' },
   { type: 'arrow', icon: ArrowUpRight, label: 'Arrow', shortcut: 'A' },
   { type: 'text', icon: Type, label: 'Text', shortcut: 'T' },
-  { type: 'sticky', icon: StickyNote, label: 'Sticky note', shortcut: 'S' },
   { type: 'circle', icon: Circle, label: 'Circle', shortcut: '' },
   { type: 'rectangle', icon: Square, label: 'Rectangle', shortcut: '' },
   { type: 'polygon', icon: Pentagon, label: 'Polygon', shortcut: '' },
@@ -34,8 +33,13 @@ export function CanvasToolbar() {
   const currentTool = useAppSelector((state) => state.canvas.currentTool);
   const currentColor = useAppSelector((state) => state.canvas.currentColor);
   const zoom = useAppSelector((state) => state.canvas.viewState.zoom);
-  const canUndo = useAppSelector((state) => state.collaboration.canUndo);
-  const canRedo = useAppSelector((state) => state.collaboration.canRedo);
+  const collaborationCanUndo = useAppSelector((state) => state.collaboration.canUndo);
+  const collaborationCanRedo = useAppSelector((state) => state.collaboration.canRedo);
+  const localCanUndo = useAppSelector((state) => state.canvas.history.past.length > 0);
+  const localCanRedo = useAppSelector((state) => state.canvas.history.future.length > 0);
+  const isLocalBoard = !boardId || user?.type === 'guest';
+  const canUndo = isLocalBoard ? localCanUndo : collaborationCanUndo;
+  const canRedo = isLocalBoard ? localCanRedo : collaborationCanRedo;
   const selectedIds = useAppSelector((state) => state.canvas.selectedIds);
   const shapes = useAppSelector((state) => state.canvas.shapes);
   const notes = useAppSelector((state) => state.canvas.notes);

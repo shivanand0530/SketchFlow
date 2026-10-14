@@ -283,30 +283,61 @@ export function CanvasRenderer({ onCursorMove }: CanvasRendererProps) {
 
     // Draw notes
     notes.forEach((note: Note) => {
-      ctx.fillStyle = note.color;
+      const isStickyNote = note.kind === 'sticky' || note.kind === undefined;
       const noteWidth = note.width ?? Math.max(140, note.text.length * 8);
       const noteHeight = note.height ?? 64;
-      ctx.fillStyle = `${note.color}33`;
-      ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
-      ctx.strokeStyle = note.color;
-      ctx.strokeRect(note.x, note.y, noteWidth, noteHeight);
+
       ctx.fillStyle = note.textColor ?? '#1f2937';
       ctx.font = `${14 / viewState.zoom}px sans-serif`;
-      note.text.split('\n').forEach((line, index) => ctx.fillText(line, note.x + 10 / viewState.zoom, note.y + (20 + index * 18) / viewState.zoom));
-      
+
+      if (isStickyNote) {
+        ctx.fillStyle = `${note.color}33`;
+        ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
+        ctx.strokeStyle = note.color;
+        ctx.strokeRect(note.x, note.y, noteWidth, noteHeight);
+      }
+
+      ctx.fillStyle = note.textColor ?? '#1f2937';
+      ctx.save();
+      if (isStickyNote) {
+        ctx.beginPath();
+        ctx.rect(note.x, note.y, noteWidth, noteHeight);
+        ctx.clip();
+      }
+      const maxTextWidth = isStickyNote ? noteWidth - 20 / viewState.zoom : noteWidth - 12 / viewState.zoom;
+      const lineHeight = 18 / viewState.zoom;
+      const wrappedLines = note.text.split('\n').flatMap((line) => {
+        const words = line.split(/\s+/);
+        const lines: string[] = [];
+        let currentLine = '';
+        words.forEach((word) => {
+          const candidate = currentLine ? `${currentLine} ${word}` : word;
+          if (currentLine && ctx.measureText(candidate).width > maxTextWidth) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = candidate;
+          }
+        });
+        if (currentLine || !lines.length) lines.push(currentLine);
+        return lines;
+      });
+      wrappedLines.forEach((line, index) => ctx.fillText(line, note.x + (isStickyNote ? 10 : 4) / viewState.zoom, note.y + (isStickyNote ? 20 : 12) / viewState.zoom + index * lineHeight));
+      ctx.restore();
+
       // Draw selection highlight for notes
       if (selectedIds.includes(note.id)) {
         ctx.strokeStyle = '#3b82f6';
         ctx.lineWidth = 2 / viewState.zoom;
         ctx.setLineDash([5 / viewState.zoom, 5 / viewState.zoom]);
-        
+
         ctx.strokeRect(
-          note.x - 4 / viewState.zoom,
-          note.y - 4 / viewState.zoom,
-          noteWidth + 8 / viewState.zoom,
-          noteHeight + 8 / viewState.zoom
+          note.x - (isStickyNote ? 4 : 2) / viewState.zoom,
+          note.y - (isStickyNote ? 4 : 2) / viewState.zoom,
+          noteWidth + (isStickyNote ? 8 : 4) / viewState.zoom,
+          noteHeight + (isStickyNote ? 8 : 4) / viewState.zoom
         );
-        
+
         ctx.setLineDash([]);
       }
     });
@@ -595,7 +626,7 @@ export function CanvasRenderer({ onCursorMove }: CanvasRendererProps) {
       const isEditing = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
       if (!isEditing && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const shortcuts: Record<string, ToolType> = {
-          v: 'select', h: 'hand', p: 'pen', l: 'line', a: 'arrow', t: 'text', s: 'sticky',
+          v: 'select', h: 'hand', p: 'pen', l: 'line', a: 'arrow', t: 'text',
         };
         const tool = shortcuts[e.key.toLowerCase()];
         if (tool) {
@@ -780,18 +811,37 @@ export function CanvasRenderer({ onCursorMove }: CanvasRendererProps) {
     if (editingNoteId) {
       dispatch(updateNote({ id: editingNoteId, text }));
       setEditingNoteId(null);
+      setEditingNoteText('');
       return;
     }
+
+    const isStickyNote = currentTool === 'sticky' || currentTool === 'note';
+    const noteColor = isStickyNote ? '#facc15' : currentColor;
+    const noteTextColor = isStickyNote ? '#3f2f00' : '#1f2937';
+    const noteWidth = isStickyNote ? 180 : Math.max(80, Math.min(260, text.length * 8 + 24));
+    const lineCount = Math.max(1, text.split('\n').length);
+    const noteHeight = isStickyNote ? 90 : Math.max(24, lineCount * 18 + 12);
+
     dispatch(addNote({
       id: Date.now().toString(),
       text,
       x: notePosition.x,
       y: notePosition.y,
-      color: currentColor,
+      color: noteColor,
+      textColor: noteTextColor,
       timestamp: Date.now(),
-      width: 180,
-      height: 90,
+      width: noteWidth,
+      height: noteHeight,
+      kind: isStickyNote ? 'sticky' : 'text',
     }));
+  };
+
+  const handleNoteDialogChange = (open: boolean) => {
+    setNoteDialogOpen(open);
+    if (!open) {
+      setEditingNoteId(null);
+      setEditingNoteText('');
+    }
   };
 
   const handleDoubleClick = (e: MouseEvent<HTMLCanvasElement>) => {
@@ -828,7 +878,7 @@ export function CanvasRenderer({ onCursorMove }: CanvasRendererProps) {
       </div>
       <NoteDialog
         open={noteDialogOpen}
-        onOpenChange={setNoteDialogOpen}
+        onOpenChange={handleNoteDialogChange}
         onSubmit={handleAddNote}
         initialText={editingNoteText}
       />
